@@ -79,7 +79,10 @@ php artisan make:crud banks api        //This will create API only controllers
 ```
 php artisan make:crud {table_name} --route={route_name}
 ```
-
+- Dry run Code
+```
+php artisan make:crud {table_name} --dry-run
+```
 
 ## Examples
 

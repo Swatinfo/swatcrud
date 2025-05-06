@@ -118,6 +118,38 @@ abstract class GeneratorCommand extends Command implements PromptsForMissingInpu
     abstract protected function buildViews(): static;
 
     /**
+     * Get the path to the module.
+     *
+     * @return string
+     */
+    protected function getModulePath(): string
+    {
+        return base_path('Modules/' . $this->options['module']);
+    }
+
+    /**
+     * Get the namespace for the module.
+     *
+     * @return string
+     */
+    protected function getModuleNamespace(): string
+    {
+        return 'Modules\\' . $this->options['module'];
+    }
+
+    /**
+     * Get the namespace for the module.
+     *
+     * @return string
+     */
+    protected function getModuleSpecificNamespace(string $baseNamespace): string
+    {
+        // Strip App\ from namespace and replace with Module namespace
+        $moduleNamespace = $this->getModuleNamespace();
+        return str_replace('App\\', $moduleNamespace . '\\', $baseNamespace);
+    }
+
+    /**
      * Build the directory if necessary.
      *
      * @param  string  $path
@@ -126,12 +158,35 @@ abstract class GeneratorCommand extends Command implements PromptsForMissingInpu
      */
     protected function makeDirectory(string $path): string
     {
+
+        if ($this->options['dry-run']) {
+            $path = str_replace(base_path(), base_path('DryRun'), $path);
+        }
+
         if (! $this->files->isDirectory(dirname($path))) {
             $this->files->makeDirectory(dirname($path), 0777, true, true);
         }
 
         return $path;
     }
+
+    protected function getDryRunPath(string $path): string
+    {
+        if (!$this->options['dry-run']) {
+            return $path;
+        }
+
+        // Create DryRun base directory
+        $dryRunBase = base_path('DryRun');
+        if (!$this->files->exists($dryRunBase)) {
+            $this->files->makeDirectory($dryRunBase, 0755, true);
+        }
+
+        // Convert absolute path to relative path under dry-run
+        $relativePath = Str::after($path, base_path());
+        return $dryRunBase . $relativePath;
+    }
+
 
     /**
      * Write the file/Class.
@@ -141,9 +196,17 @@ abstract class GeneratorCommand extends Command implements PromptsForMissingInpu
      */
     protected function write(string $path, string $content): void
     {
-        $this->makeDirectory($path);
 
+        $path = $this->getDryRunPath($path);
+        $this->makeDirectory($path);
         $this->files->put($path, $content);
+
+        if ($this->options['dry-run']) {
+            $this->info("Would create file: " . $path);
+        }
+
+        /*$this->makeDirectory($path);
+        $this->files->put($path, $content);*/
     }
 
     /**
@@ -160,10 +223,10 @@ abstract class GeneratorCommand extends Command implements PromptsForMissingInpu
         $stub_path = config('crud.stub_path', 'default');
 
         if (blank($stub_path) || $stub_path == 'default') {
-            $stub_path = __DIR__.'/../stubs/';
+            $stub_path = __DIR__ . '/../stubs/';
         }
 
-        $path = Str::finish($stub_path, '/')."$type.stub";
+        $path = Str::finish($stub_path, '/') . "$type.stub";
 
         if (! $content) {
             return $path;
@@ -189,7 +252,9 @@ abstract class GeneratorCommand extends Command implements PromptsForMissingInpu
      */
     protected function _getControllerPath(string $name): string
     {
-        return app_path($this->_getNamespacePath($this->controllerNamespace)."{$name}Controller.php");
+        // return app_path($this->_getNamespacePath($this->controllerNamespace) . "{$name}Controller.php");
+
+        return $this->getModulePath() . $this->_getNamespacePath($this->controllerNamespace) . "{$name}Controller.php";
     }
 
     /**
@@ -199,7 +264,9 @@ abstract class GeneratorCommand extends Command implements PromptsForMissingInpu
      */
     protected function _getApiControllerPath(string $name): string
     {
-        return app_path($this->_getNamespacePath($this->apiControllerNamespace)."{$name}Controller.php");
+        // return app_path($this->_getNamespacePath($this->apiControllerNamespace) . "{$name}Controller.php");
+
+        return $this->getModulePath() . $this->_getNamespacePath($this->apiControllerNamespace) . "{$name}Controller.php";
     }
 
     /**
@@ -209,7 +276,9 @@ abstract class GeneratorCommand extends Command implements PromptsForMissingInpu
      */
     protected function _getResourcePath(string $name): string
     {
-        return app_path($this->_getNamespacePath($this->resourceNamespace)."{$name}Resource.php");
+        // return app_path($this->_getNamespacePath($this->resourceNamespace) . "{$name}Resource.php");
+
+        return $this->getModulePath() . $this->_getNamespacePath($this->resourceNamespace) . "{$name}Resource.php";
     }
 
     /**
@@ -219,7 +288,9 @@ abstract class GeneratorCommand extends Command implements PromptsForMissingInpu
      */
     protected function _getLivewirePath(string $name): string
     {
-        return app_path($this->_getNamespacePath($this->livewireNamespace)."{$name}.php");
+        // return app_path($this->_getNamespacePath($this->livewireNamespace) . "{$name}.php");
+
+        return $this->getModulePath() . $this->_getNamespacePath($this->livewireNamespace) . "{$name}.php";
     }
 
     /**
@@ -229,7 +300,9 @@ abstract class GeneratorCommand extends Command implements PromptsForMissingInpu
      */
     protected function _getRequestPath(string $name): string
     {
-        return app_path($this->_getNamespacePath($this->requestNamespace)."{$name}Request.php");
+        // return app_path($this->_getNamespacePath($this->requestNamespace) . "{$name}Request.php");
+
+        return $this->getModulePath() . $this->_getNamespacePath($this->requestNamespace) . "{$name}Request.php";
     }
 
     /**
@@ -239,7 +312,9 @@ abstract class GeneratorCommand extends Command implements PromptsForMissingInpu
      */
     protected function _getModelPath(string $name): string
     {
-        return $this->makeDirectory(app_path($this->_getNamespacePath($this->modelNamespace)."$name.php"));
+        // return $this->makeDirectory(app_path($this->_getNamespacePath($this->modelNamespace) . "$name.php"));
+
+        return $this->makeDirectory($this->getModulePath() . $this->_getNamespacePath($this->modelNamespace) . "$name.php");
     }
 
     /**
@@ -273,13 +348,20 @@ abstract class GeneratorCommand extends Command implements PromptsForMissingInpu
      */
     protected function _getViewPath(string $view): string
     {
+        // $name = Str::kebab($this->name);
+        // $path = match ($this->options['stack']) {
+        //     'livewire' => "/views/livewire/$name/$view.blade.php",
+        //     default => "/views/$name/$view.blade.php"
+        // };
+        // return $this->makeDirectory(resource_path($path));
+
         $name = Str::kebab($this->name);
         $path = match ($this->options['stack']) {
-            'livewire' => "/views/livewire/$name/$view.blade.php",
-            default => "/views/$name/$view.blade.php"
+            'livewire' => "/Resources/views/livewire/$name/$view.blade.php",
+            default => "/Resources/views/$name/$view.blade.php"
         };
 
-        return $this->makeDirectory(resource_path($path));
+        return $this->makeDirectory($this->getModulePath() . $path);
     }
 
     /**
@@ -289,7 +371,7 @@ abstract class GeneratorCommand extends Command implements PromptsForMissingInpu
      */
     protected function buildReplacements(): array
     {
-        return [
+        /*return [
             '{{layout}}' => $this->layout,
             '{{modelName}}' => $this->name,
             '{{modelTitle}}' => Str::title(Str::snake($this->name, ' ')),
@@ -300,6 +382,24 @@ abstract class GeneratorCommand extends Command implements PromptsForMissingInpu
             '{{resourceNamespace}}' => $this->resourceNamespace,
             '{{requestNamespace}}' => $this->requestNamespace,
             '{{livewireNamespace}}' => $this->livewireNamespace,
+            '{{modelNamePluralLowerCase}}' => Str::camel(Str::plural($this->name)),
+            '{{modelNamePluralUpperCase}}' => ucfirst(Str::plural($this->name)),
+            '{{modelNameLowerCase}}' => Str::camel($this->name),
+            '{{modelRoute}}' => $this->_getRoute(),
+            '{{modelView}}' => Str::kebab($this->name),
+        ];*/
+
+        return [
+            '{{layout}}' => $this->layout,
+            '{{modelName}}' => $this->name,
+            '{{modelTitle}}' => Str::title(Str::snake($this->name, ' ')),
+            '{{modelTitlePlural}}' => Str::title(Str::snake(Str::plural($this->name), ' ')),
+            '{{modelNamespace}}' => $this->getModuleSpecificNamespace($this->modelNamespace),
+            '{{controllerNamespace}}' => $this->getModuleSpecificNamespace($this->controllerNamespace),
+            '{{apiControllerNamespace}}' => $this->getModuleSpecificNamespace($this->apiControllerNamespace),
+            '{{resourceNamespace}}' => $this->getModuleSpecificNamespace($this->resourceNamespace),
+            '{{requestNamespace}}' => $this->getModuleSpecificNamespace($this->requestNamespace),
+            '{{livewireNamespace}}' => $this->getModuleSpecificNamespace($this->livewireNamespace),
             '{{modelNamePluralLowerCase}}' => Str::camel(Str::plural($this->name)),
             '{{modelNamePluralUpperCase}}' => ucfirst(Str::plural($this->name)),
             '{{modelNameLowerCase}}' => Str::camel($this->name),
@@ -337,7 +437,9 @@ abstract class GeneratorCommand extends Command implements PromptsForMissingInpu
         };
 
         return str_replace(
-            array_keys($replace), array_values($replace), $this->getStub($path)
+            array_keys($replace),
+            array_values($replace),
+            $this->getStub($path)
         );
     }
 
@@ -360,7 +462,7 @@ abstract class GeneratorCommand extends Command implements PromptsForMissingInpu
         return str_replace(
             array_keys($replace),
             array_values($replace),
-            $this->_getSpace(9).'<th '.$attr.'>{{title}}</th>'."\n"
+            $this->_getSpace(9) . '<th ' . $attr . '>{{title}}</th>' . "\n"
         );
     }
 
@@ -383,7 +485,7 @@ abstract class GeneratorCommand extends Command implements PromptsForMissingInpu
         return str_replace(
             array_keys($replace),
             array_values($replace),
-            $this->_getSpace(10).'<td '.$attr.'>{{ ${{modelNameLowerCase}}->{{column}} }}</td>'."\n"
+            $this->_getSpace(10) . '<td ' . $attr . '>{{ ${{modelNameLowerCase}}->{{column}} }}</td>' . "\n"
         );
     }
 
@@ -398,7 +500,7 @@ abstract class GeneratorCommand extends Command implements PromptsForMissingInpu
             return;
         }
 
-        if (view()->exists($this->layout) || view()->exists('components.'.$this->layout)) {
+        if (view()->exists($this->layout) || view()->exists('components.' . $this->layout)) {
             return;
         }
 
@@ -511,7 +613,7 @@ abstract class GeneratorCommand extends Command implements PromptsForMissingInpu
             $rulesArray = Arr::except($rulesArray, $this->unwantedColumns);
             // Make rulesArray
             foreach ($rulesArray as $col => $rule) {
-                $rules .= "\n\t\t\t'$col' => '".implode('|', $rule)."',";
+                $rules .= "\n\t\t\t'$col' => '" . implode('|', $rule) . "',";
             }
 
             return $rules;
@@ -523,7 +625,7 @@ abstract class GeneratorCommand extends Command implements PromptsForMissingInpu
 
             // Add quotes to the unwanted columns for fillable
             array_walk($filterColumns, function (&$value) {
-                $value = "'".$value."'";
+                $value = "'" . $value . "'";
             });
 
             // CSV format
@@ -565,6 +667,8 @@ abstract class GeneratorCommand extends Command implements PromptsForMissingInpu
     {
         $this->options['route'] = null;
         $this->options['stack'] = $this->argument('stack');
+        $this->options['module'] = $this->argument('module');
+        $this->options['dry-run'] = $this->option('dry-run');
 
         return $this;
     }
@@ -602,10 +706,10 @@ abstract class GeneratorCommand extends Command implements PromptsForMissingInpu
         );
 
         return (new Process($command, base_path(), ['COMPOSER_MEMORY_LIMIT' => '-1']))
-                ->setTimeout(null)
-                ->run(function ($type, $output) {
-                    $this->output->write($output);
-                }) === 0;
+            ->setTimeout(null)
+            ->run(function ($type, $output) {
+                $this->output->write($output);
+            }) === 0;
     }
 
     /**
@@ -622,12 +726,12 @@ abstract class GeneratorCommand extends Command implements PromptsForMissingInpu
             try {
                 $process->setTty(true);
             } catch (RuntimeException $e) {
-                $this->output->writeln('  <bg=yellow;fg=black> WARN </> '.$e->getMessage().PHP_EOL);
+                $this->output->writeln('  <bg=yellow;fg=black> WARN </> ' . $e->getMessage() . PHP_EOL);
             }
         }
 
         $process->run(function ($type, $line) {
-            $this->output->write('    '.$line);
+            $this->output->write('    ' . $line);
         });
     }
 }

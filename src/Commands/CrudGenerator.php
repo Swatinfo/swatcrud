@@ -7,6 +7,7 @@ use Illuminate\Contracts\Filesystem\FileNotFoundException;
 use Illuminate\Support\Str;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
+use Ibex\CrudGenerator\RouteGenerator;
 use function Laravel\Prompts\select;
 
 /**
@@ -24,7 +25,9 @@ class CrudGenerator extends GeneratorCommand
     protected $signature = 'make:crud
                             {name : Table name}
                             {stack : The development stack that should be installed (bootstrap,tailwind,livewire,api)}
-                            {--route= : Custom route name}';
+                            {module : The module name}
+                            {--route= : Custom route name}
+                            {--dry-run : Execute in dry run mode}';
 
     /**
      * The console command description.
@@ -54,6 +57,25 @@ class CrudGenerator extends GeneratorCommand
         // Build the class name from table name
         $this->name = $this->_buildClassName();
 
+        $isDryRun = $this->option('dry-run');
+
+
+        // Create module structure first
+        $moduleGenerator = new ModuleGenerator(
+            $this->argument('module'),
+            $isDryRun,
+            $this
+        );
+        $moduleGenerator->generate();
+
+        if ($isDryRun) {
+            $this->info('=== Dry Run Mode ===');
+            $this->info('The following files would be created:');
+        }
+
+        // Add route generation
+        // $routeGenerator = new RouteGenerator($this->argument('name'), $this->argument('stack'));
+
         // Generate the crud
         $this->buildOptions()
             ->buildController()
@@ -61,7 +83,11 @@ class CrudGenerator extends GeneratorCommand
             ->buildViews()
             ->writeRoute();
 
-        $this->info('Created Successfully.');
+        if ($isDryRun) {
+            $this->info('No files were actually created.');
+        } else {
+            $this->info('Created Successfully.');
+        }
 
         return true;
     }
@@ -95,7 +121,23 @@ class CrudGenerator extends GeneratorCommand
 
     protected function writeRoute(): static
     {
-        $replacements = $this->buildReplacements();
+
+
+        $routeGenerator = new RouteGenerator(
+            $this->name,
+            $this->options['stack'],
+            $this->options['dry-run'],
+            $this->argument('module')
+        );
+
+        $routeGenerator->generate();
+
+        if ($this->options['dry-run']) {
+            $this->info('Routes would be added to ' . ($this->options['stack'] === 'api' ? 'routes/api.php' : 'routes/web.php'));
+        }
+
+        return $this;
+        /* $replacements = $this->buildReplacements();
 
         $this->info('Please add route below: i:e; web.php or api.php');
 
@@ -122,7 +164,7 @@ class CrudGenerator extends GeneratorCommand
 
         $this->info('');
 
-        return $this;
+        return $this;*/
     }
 
     /**
@@ -157,7 +199,9 @@ class CrudGenerator extends GeneratorCommand
         };
 
         $controllerTemplate = str_replace(
-            array_keys($replace), array_values($replace), $this->getStub($stubFolder.'Controller')
+            array_keys($replace),
+            array_values($replace),
+            $this->getStub($stubFolder . 'Controller')
         );
 
         $this->write($controllerPath, $controllerTemplate);
@@ -166,7 +210,9 @@ class CrudGenerator extends GeneratorCommand
             $resourcePath = $this->_getResourcePath($this->name);
 
             $resourceTemplate = str_replace(
-                array_keys($replace), array_values($replace), $this->getStub($stubFolder.'Resource')
+                array_keys($replace),
+                array_values($replace),
+                $this->getStub($stubFolder . 'Resource')
             );
 
             $this->write($resourcePath, $resourceTemplate);
@@ -183,20 +229,24 @@ class CrudGenerator extends GeneratorCommand
         $replace = array_merge($this->buildReplacements(), $this->modelReplacements());
 
         foreach (['Index', 'Show', 'Edit', 'Create'] as $component) {
-            $componentPath = $this->_getLivewirePath($folder.'/'.$component);
+            $componentPath = $this->_getLivewirePath($folder . '/' . $component);
 
             $componentTemplate = str_replace(
-                array_keys($replace), array_values($replace), $this->getStub('livewire/'.$component)
+                array_keys($replace),
+                array_values($replace),
+                $this->getStub('livewire/' . $component)
             );
 
             $this->write($componentPath, $componentTemplate);
         }
 
         // Form
-        $formPath = $this->_getLivewirePath('Forms/'.$this->name.'Form');
+        $formPath = $this->_getLivewirePath('Forms/' . $this->name . 'Form');
 
         $componentTemplate = str_replace(
-            array_keys($replace), array_values($replace), $this->getStub('livewire/Form')
+            array_keys($replace),
+            array_values($replace),
+            $this->getStub('livewire/Form')
         );
 
         $this->write($formPath, $componentTemplate);
@@ -221,7 +271,9 @@ class CrudGenerator extends GeneratorCommand
         $replace = array_merge($this->buildReplacements(), $this->modelReplacements());
 
         $modelTemplate = str_replace(
-            array_keys($replace), array_values($replace), $this->getStub('Model')
+            array_keys($replace),
+            array_values($replace),
+            $this->getStub('Model')
         );
 
         $this->write($modelPath, $modelTemplate);
@@ -232,7 +284,9 @@ class CrudGenerator extends GeneratorCommand
         $this->info('Creating Request Class ...');
 
         $requestTemplate = str_replace(
-            array_keys($replace), array_values($replace), $this->getStub('Request')
+            array_keys($replace),
+            array_values($replace),
+            $this->getStub('Request')
         );
 
         $this->write($requestPath, $requestTemplate);
@@ -284,7 +338,9 @@ class CrudGenerator extends GeneratorCommand
             };
 
             $viewTemplate = str_replace(
-                array_keys($replace), array_values($replace), $this->getStub($path)
+                array_keys($replace),
+                array_values($replace),
+                $this->getStub($path)
             );
 
             $this->write($this->_getViewPath($view), $viewTemplate);
