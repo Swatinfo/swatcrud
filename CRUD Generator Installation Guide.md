@@ -58,10 +58,13 @@ mkdir Modules
 Add the following to `config/app.php`:
 
 ```php
-'providers' => [
-    // ...existing providers...
-    Ibex\CrudGenerator\CrudServiceProvider::class,
-]
+// In app/Providers/AppServiceProvider.php
+use Ibex\CrudGenerator\CrudServiceProvider;
+
+public function register(): void
+{
+    $this->app->register(CrudServiceProvider::class);
+}
 ```
 
 ### 6. Rebuild Autoloader
