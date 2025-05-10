@@ -2,6 +2,7 @@
 
 namespace {{controllerNamespace}};
 
+use Illuminate\Routing\Controller;
 use {{modelNamespace}}\{{modelName}};
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;

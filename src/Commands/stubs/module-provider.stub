@@ -1,22 +1,30 @@
 <?php
 
-namespace Modules\{{moduleName}}\Providers;
+//namespace Modules\{{moduleName}}\Providers;
+namespace {{moduleNameNameSpace}};
 
 use Illuminate\Support\ServiceProvider;
 
 class {{moduleName}}ServiceProvider extends ServiceProvider
 {
     protected string $moduleName = '{{moduleName}}';
+    protected string $modulePath = '{{modulePath}}';
 
     public function boot()
     {
-        $this->loadMigrationsFrom(module_path($this->moduleName, 'Database/Migrations'));
+
+        /*$this->loadMigrationsFrom(module_path($this->moduleName, 'Database/Migrations'));
         $this->loadRoutesFrom(module_path($this->moduleName, 'Routes/web.php'));
-        $this->loadRoutesFrom(module_path($this->moduleName, 'Routes/api.php')); 
-        $this->loadViewsFrom(module_path($this->moduleName, 'Resources/views'), $this->moduleName);
+        $this->loadRoutesFrom(module_path($this->moduleName, 'Routes/api.php'));
+        $this->loadViewsFrom(module_path($this->moduleName, 'Resources/views'), $this->moduleName);*/
+
+        $this->loadMigrationsFrom('{{modulePath}}/Database/Migrations');
+        $this->loadRoutesFrom('{{modulePath}}/Routes/web.php');
+        $this->loadRoutesFrom('{{modulePath}}/Routes/api.php');
+        $this->loadViewsFrom('{{modulePath}}/Resources/views' ,'{{moduleName}}');
     }
 
-    public function register() 
+    public function register()
     {
         $this->app->register(RouteServiceProvider::class);
     }

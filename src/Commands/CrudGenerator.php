@@ -8,6 +8,7 @@ use Illuminate\Support\Str;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 use Ibex\CrudGenerator\RouteGenerator;
+
 use function Laravel\Prompts\select;
 
 /**
@@ -27,7 +28,8 @@ class CrudGenerator extends GeneratorCommand
                             {stack : The development stack that should be installed (bootstrap,tailwind,livewire,api)}
                             {module : The module name}
                             {--route= : Custom route name}
-                            {--dry-run : Execute in dry run mode}';
+                            {--dry-run : Execute in dry run mode}
+                            {--module-dir= : Create Module inside folder}';
 
     /**
      * The console command description.
@@ -43,29 +45,42 @@ class CrudGenerator extends GeneratorCommand
      */
     public function handle()
     {
+        // $this->info("Start ....1");
         $this->info('Running Crud Generator ...');
 
         $this->table = $this->getNameInput();
-
+        // $this->info("Start ....2");
         // If table not exist in DB return
         if (! $this->tableExists()) {
             $this->error("`$this->table` table not exist");
 
             return false;
         }
-
+        // $this->info("Start ....3");
+        $this->buildOptions();
+        // $this->info("Start ....4");
         // Build the class name from table name
         $this->name = $this->_buildClassName();
-
+        // $this->info("Start ....5");
         $isDryRun = $this->option('dry-run');
+        $moduleDir = $this->options['module-dir'];
+
+        // $this->info("Dir..." . $moduleDir);
 
 
+
+        // $this->info("Start ....6");
         // Create module structure first
+
+
+
         $moduleGenerator = new ModuleGenerator(
-            $this->argument('module'),
+            $this->options['module'],
             $isDryRun,
-            $this
+            $moduleDir,
+            $this,
         );
+        // $this->info("Start ....7");
         $moduleGenerator->generate();
 
         if ($isDryRun) {
@@ -73,18 +88,15 @@ class CrudGenerator extends GeneratorCommand
             $this->info('The following files would be created:');
         }
 
-        // Add route generation
-        // $routeGenerator = new RouteGenerator($this->argument('name'), $this->argument('stack'));
 
         // Generate the crud
-        $this->buildOptions()
-            ->buildController()
+        $this->buildController()
             ->buildModel()
             ->buildViews()
             ->writeRoute();
 
         if ($isDryRun) {
-            $this->info('No files were actually created.');
+            $this->info('Files were created in dry run folder.');
         } else {
             $this->info('Created Successfully.');
         }
@@ -95,7 +107,7 @@ class CrudGenerator extends GeneratorCommand
     protected function promptForMissingArgumentsUsing(): array
     {
         return [
-            'stack' => fn() => select(
+            'stack' => fn () => select(
                 label: 'Which stack would you like to install?',
                 options: [
                     'bootstrap' => 'Blade with Bootstrap css',
@@ -105,6 +117,7 @@ class CrudGenerator extends GeneratorCommand
                 ],
                 scroll: 4,
             ),
+            'module' => 'Name of module which needs to be generated?',
         ];
     }
 
@@ -122,18 +135,41 @@ class CrudGenerator extends GeneratorCommand
     protected function writeRoute(): static
     {
 
+        $replacements = $this->buildReplacements();
+
+
+        $modulePath = $this->options['module'];
+        $isDryRun = $this->options['dry-run'];
+
+
+        if ($this->options['module-dir']) {
+            $modulePath = $this->options['module-dir'] . "\\" . $this->options['module'];
+        }
+
 
         $routeGenerator = new RouteGenerator(
             $this->name,
             $this->options['stack'],
             $this->options['dry-run'],
-            $this->argument('module')
+            $modulePath
         );
 
         $routeGenerator->generate();
 
+        $routePath = "";
+        $basePath = $isDryRun ? 'DryRun' : '';
+        if ($modulePath) {
+            $routePath = $basePath . "/Modules/{$modulePath}/Routes/" . ($this->options['stack'] === 'api' ? 'api.php' : 'web.php');
+        } else {
+            $routePath = $basePath . '/routes/' . ($this->options['stack'] === 'api' ? 'api.php' : 'web.php');
+        }
+
+        $routePath = str_replace("/", "\\", $routePath);
+
+        // echo $routePath;
+
         if ($this->options['dry-run']) {
-            $this->info('Routes would be added to ' . ($this->options['stack'] === 'api' ? 'routes/api.php' : 'routes/web.php'));
+            $this->info('Routes would be added to ' . $routePath);
         }
 
         return $this;
@@ -180,10 +216,15 @@ class CrudGenerator extends GeneratorCommand
 
             return $this;
         }
+        $replace = $this->buildReplacements();
+
+        // echo "<pre>".print_r($replace,true)."</pre>";
 
         $controllerPath = $this->options['stack'] == 'api'
             ? $this->_getApiControllerPath($this->name)
             : $this->_getControllerPath($this->name);
+
+        // $this->info("Controller Path $controllerPath...");
 
         if ($this->files->exists($controllerPath) && $this->ask('Already exist Controller. Do you want overwrite (y/n)?', 'y') == 'n') {
             return $this;
@@ -191,7 +232,6 @@ class CrudGenerator extends GeneratorCommand
 
         $this->info('Creating Controller ...');
 
-        $replace = $this->buildReplacements();
 
         $stubFolder = match ($this->options['stack']) {
             'api' => 'api/',
@@ -203,6 +243,9 @@ class CrudGenerator extends GeneratorCommand
             array_values($replace),
             $this->getStub($stubFolder . 'Controller')
         );
+
+        // $this->info("Controller Path $controllerPath...");
+        // $this->info("Controller Template $controllerTemplate...");
 
         $this->write($controllerPath, $controllerTemplate);
 
@@ -329,7 +372,7 @@ class CrudGenerator extends GeneratorCommand
             '{{form}}' => $form,
         ]);
 
-        $this->buildLayout();
+        // $this->buildLayout();
 
         foreach (['index', 'create', 'edit', 'form', 'show'] as $view) {
             $path = match ($this->options['stack']) {
@@ -337,12 +380,25 @@ class CrudGenerator extends GeneratorCommand
                 default => "views/{$this->options['stack']}/$view"
             };
 
+
+            $this->info("Path....$path");
+            // return $this;
+
+
+
+            if ($this->files->exists($this->_getViewPath($view)) && $this->ask('Already exist ' . $view . '. Do you want overwrite (y/n)?', 'y') == 'n') {
+                // return $this;
+                continue;
+            }
+
             $viewTemplate = str_replace(
                 array_keys($replace),
                 array_values($replace),
                 $this->getStub($path)
             );
 
+            // $this->info("Creating View Path: " . $this->_getViewPath($view));
+            // $this->info("From Template: " . $viewTemplate);
             $this->write($this->_getViewPath($view), $viewTemplate);
         }
 

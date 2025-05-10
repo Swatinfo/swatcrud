@@ -81,7 +81,7 @@ php artisan make:crud {table_name} --route={route_name}
 ```
 - Dry run Code
 ```
-php artisan make:crud {table_name} --dry-run
+php artisan make:crud {table_name} module{module_name} --dry-run --module-dir={module_directory}
 ```
 
 ## Examples
